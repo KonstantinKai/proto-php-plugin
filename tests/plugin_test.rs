@@ -207,7 +207,6 @@ mod php_tool {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore] // Requires remote releases.json in new format (with checksums)
     #[should_panic(expected = "does not have prebuilt binaries available")]
     async fn releases_index_rejects_missing_version() {
         let sandbox = create_empty_proto_sandbox();

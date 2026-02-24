@@ -146,13 +146,11 @@ configure-opts = ["--without-iconv"]
 
 ### Prebuilt binaries (default)
 
-The static-php-cli prebuilt binaries ship with ~36 extensions compiled in. Key extensions include:
+The static-php-cli prebuilt binaries ship with 37 extensions compiled in ([source](https://dl.static-php.dev/static-php-cli/common/README.txt)):
 
-`bcmath`, `calendar`, `ctype`, `curl`, `dom`, `exif`, `fileinfo`, `filter`, `ftp`, `gd`, `iconv`, `json`, `mbstring`, `mysqli`, `mysqlnd`, `openssl`, `opcache`, `pcntl`, `pdo`, `pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `phar`, `posix`, `readline`, `session`, `simplexml`, `sockets`, `sodium`, `sqlite3`, `tokenizer`, `xml`, `xmlreader`, `xmlwriter`, `zip`, `zlib`
+`bcmath`, `bz2`, `calendar`, `ctype`, `curl`, `dom`, `exif`, `fileinfo`, `filter`, `ftp`, `gd`, `gmp`, `iconv`, `mbregex`, `mbstring`, `mysqlnd`, `openssl`, `pcntl`, `pdo`, `pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `pgsql`, `phar`, `posix`, `redis`, `session`, `simplexml`, `soap`, `sockets`, `sqlite3`, `tokenizer`, `xml`, `xmlreader`, `xmlwriter`, `zip`, `zlib`
 
 These extensions are statically linked and always available — no additional installation needed. However, `pecl`, `phpize`, and `php-config` are **not included** in prebuilt binaries, so installing additional extensions via PECL is not possible.
-
-For the full and up-to-date extension list, see the [static-php-cli extension list](https://static-php.dev/en/guide/extensions.html).
 
 ### Source builds
 
