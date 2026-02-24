@@ -11,7 +11,7 @@ jobs:
     name: Build & Test
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -38,13 +38,13 @@ jobs:
       - name: Run tests
         run: cargo test
 
-  release:
-    name: Release
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  e2e:
+    name: E2E (${{ matrix.os }})
     needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -54,17 +54,42 @@ jobs:
         with:
           targets: wasm32-wasip1
 
-      - name: Build release WASM
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Get version
-        id: version
-        run: echo "version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')" >> "$GITHUB_OUTPUT"
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
-          files: target/wasm32-wasip1/release/php_tool.wasm
-          generate_release_notes: true
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build WASM plugin
+        run: cargo build --target wasm32-wasip1
+
+      - name: Install proto (Unix)
+        if: runner.os != 'Windows'
+        run: bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes
+
+      - name: Install proto (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: irm https://moonrepo.dev/install/proto.ps1 | iex
+
+      - name: Add proto to PATH (Unix)
+        if: runner.os != 'Windows'
+        run: echo "$HOME/.proto/bin" >> "$GITHUB_PATH"
+
+      - name: Add proto to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.proto\bin" | Out-File -Append -FilePath $env:GITHUB_PATH
+
+      - name: Register plugin and install PHP
+        run: |
+          proto plugin add php "file://./target/wasm32-wasip1/debug/php_tool.wasm"
+          proto install php 8.4
+
+      - name: Verify PHP
+        run: proto run php -- --version
+
