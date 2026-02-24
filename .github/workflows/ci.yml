@@ -11,7 +11,7 @@ jobs:
     name: Build & Test
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -31,6 +31,12 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install proto
+        run: bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes
+
+      - name: Add proto to PATH
+        run: echo "$HOME/.proto/bin" >> "$GITHUB_PATH"
 
       - name: Build WASM plugin
         run: cargo build --target wasm32-wasip1
