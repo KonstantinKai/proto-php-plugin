@@ -1,0 +1,11 @@
+---
+source: tests/plugin_test.rs
+assertion_line: 235
+expression: "std :: fs ::\nread_to_string(sandbox.path().join(\".proto/shims/registry.json\")).unwrap()"
+---
+{
+  "php": {
+    "alt_bin": true,
+    "parent": "php-test"
+  }
+}
