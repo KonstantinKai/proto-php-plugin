@@ -20,9 +20,13 @@ jobs:
         with:
           targets: wasm32-wasip1
 
-      - name: Install wabt and binaryen
+      - name: Install wabt
+        run: sudo apt-get update && sudo apt-get install -y wabt
+
+      - name: Install binaryen
         run: |
-          sudo apt-get update && sudo apt-get install -y wabt binaryen
+          curl -sSL https://github.com/WebAssembly/binaryen/releases/download/version_121/binaryen-version_121-x86_64-linux.tar.gz | tar xz -C /tmp
+          echo "/tmp/binaryen-version_121/bin" >> "$GITHUB_PATH"
 
       - name: Build WASM plugin (release)
         run: cargo build --target wasm32-wasip1 --release
@@ -32,7 +36,7 @@ jobs:
           input="target/wasm32-wasip1/release/php_tool.wasm"
           output="builds/php_tool.wasm"
           mkdir -p builds
-          wasm-opt -Os "$input" --output "$output"
+          wasm-opt -Os --enable-bulk-memory "$input" --output "$output"
           wasm-strip "$output"
           sha256sum "$output" > "$output.sha256"
 
