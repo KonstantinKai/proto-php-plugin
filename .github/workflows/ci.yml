@@ -94,7 +94,7 @@ jobs:
       - name: Register plugin and install PHP
         run: |
           proto plugin add php "file://./target/wasm32-wasip1/debug/php_tool.wasm"
-          proto install php 8.4
+          proto install php 8.4.16
 
       - name: Verify PHP
         run: proto run php -- --version
