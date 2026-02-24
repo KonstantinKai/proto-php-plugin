@@ -18,9 +18,9 @@ jobs:
       - uses: moonrepo/setup-rust@v1
         with:
           cache: false
-          targets: wasm32-wasi
+          targets: wasm32-wasip1
       - id: build
-        uses: moonrepo/build-wasm-plugin@v0
+        uses: moonrepo/build-wasm-plugin@v0.4
       - if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
         uses: ncipollo/release-action@v1
         with:
