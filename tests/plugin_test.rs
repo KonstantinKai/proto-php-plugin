@@ -171,7 +171,7 @@ mod php_tool {
         let output = plugin
             .download_prebuilt(DownloadPrebuiltInput {
                 context: PluginContext {
-                    version: VersionSpec::parse("8.4.3").unwrap(),
+                    version: VersionSpec::parse("8.4.18").unwrap(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -180,7 +180,7 @@ mod php_tool {
 
         assert!(output.download_url.contains("linux"));
         assert!(output.download_url.contains("x86_64"));
-        assert!(output.download_url.contains("8.4.3"));
+        assert!(output.download_url.contains("8.4.18"));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -195,7 +195,7 @@ mod php_tool {
         let output = plugin
             .download_prebuilt(DownloadPrebuiltInput {
                 context: PluginContext {
-                    version: VersionSpec::parse("8.4.3").unwrap(),
+                    version: VersionSpec::parse("8.4.18").unwrap(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -204,6 +204,75 @@ mod php_tool {
 
         assert!(output.download_url.contains("macos"));
         assert!(output.download_url.contains("aarch64"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires remote releases.json in new format (with checksums)
+    #[should_panic(expected = "does not have prebuilt binaries available")]
+    async fn releases_index_rejects_missing_version() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+            })
+            .await;
+
+        // 8.4.2 is not in the releases index
+        plugin
+            .download_prebuilt(DownloadPrebuiltInput {
+                context: PluginContext {
+                    version: VersionSpec::parse("8.4.2").unwrap(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn releases_index_allows_known_version() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+            })
+            .await;
+
+        // 8.4.18 is in the releases index with linux-x86_64
+        let output = plugin
+            .download_prebuilt(DownloadPrebuiltInput {
+                context: PluginContext {
+                    version: VersionSpec::parse("8.4.18").unwrap(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+
+        assert!(output.download_url.contains("8.4.18"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn releases_index_skipped_for_windows() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Windows, HostArch::X64);
+            })
+            .await;
+
+        // Windows bypasses releases index (uses windows.php.net)
+        let output = plugin
+            .download_prebuilt(DownloadPrebuiltInput {
+                context: PluginContext {
+                    version: VersionSpec::parse("8.4.3").unwrap(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+
+        assert!(output.download_url.contains("windows.php.net"));
     }
 
     #[tokio::test(flavor = "multi_thread")]

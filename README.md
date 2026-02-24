@@ -1,5 +1,9 @@
 # proto-php-plugin
 
+[![CI](https://github.com/KonstantinKai/proto-php-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/KonstantinKai/proto-php-plugin/actions/workflows/ci.yml)
+[![Release](https://github.com/KonstantinKai/proto-php-plugin/actions/workflows/release.yml/badge.svg)](https://github.com/KonstantinKai/proto-php-plugin/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A community [WASM plugin](https://moonrepo.dev/docs/proto/wasm-plugin) for [proto](https://github.com/moonrepo/proto) that manages PHP versions using pre-built static binaries.
 
 ## Installation
