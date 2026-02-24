@@ -20,13 +20,21 @@ jobs:
         with:
           targets: wasm32-wasip1
 
+      - name: Install wabt and binaryen
+        run: |
+          sudo apt-get update && sudo apt-get install -y wabt binaryen
+
       - name: Build WASM plugin (release)
         run: cargo build --target wasm32-wasip1 --release
 
-      - name: Prepare artifact
+      - name: Optimize and strip
         run: |
+          input="target/wasm32-wasip1/release/php_tool.wasm"
+          output="builds/php_tool.wasm"
           mkdir -p builds
-          cp target/wasm32-wasip1/release/php_tool.wasm builds/
+          wasm-opt -Os "$input" --output "$output"
+          wasm-strip "$output"
+          sha256sum "$output" > "$output.sha256"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
