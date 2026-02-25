@@ -45,13 +45,33 @@ Configure in `.prototools` under `[tools.php]`:
 # Disable prebuilt binaries and build from source (default: true)
 prebuilt = false
 
+# SAPI type for prebuilt binaries: "cli", "fpm", or "micro" (default: "cli")
+sapi = "fpm"
+
 # Custom download URL template (advanced)
-# Placeholders: {version}, {os}, {arch}, {file}
-dist-url = "https://example.com/php-{version}-cli-{os}-{arch}.tar.gz"
+# Placeholders: {version}, {sapi}, {os}, {arch}, {file}
+dist-url = "https://example.com/php-{version}-{sapi}-{os}-{arch}.tar.gz"
 
 # Extra flags passed to ./configure when building from source
 configure-opts = ["--with-pdo-pgsql", "--enable-intl", "--enable-soap"]
 ```
+
+## SAPI Selection
+
+The [static-php-cli](https://static-php.dev) project provides prebuilt binaries for three SAPI types:
+
+| SAPI    | Description                                         |
+|---------|-----------------------------------------------------|
+| `cli`   | Standard command-line interface (default)            |
+| `fpm`   | FastCGI Process Manager for web serving              |
+| `micro` | Self-contained micro binary (single-file executable) |
+
+```toml
+[tools.php]
+sapi = "fpm"
+```
+
+The `sapi` option only applies to Linux and macOS prebuilt binaries. Windows binaries from `windows.php.net` are always NTS CLI builds and ignore this setting.
 
 ## Supported Platforms
 
@@ -197,7 +217,6 @@ Windows prebuilt binaries come from the official `windows.php.net` and cover all
 | **macOS** | x64, arm64 | x64, arm64 | x64, arm64 |
 | **Windows** | No | No | x64 |
 | **Version file** | `.php-version` | `.tool-versions` | `.php-version`, `composer.json` |
-| **Checksum verification** | No | No | SHA-256 |
 | **Build from source** | Only option | Only option | Opt-in fallback |
 | **Bundled extensions** | User-configured | User-configured | 37 built-in |
 

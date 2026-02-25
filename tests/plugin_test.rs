@@ -207,74 +207,6 @@ mod php_tool {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic(expected = "does not have prebuilt binaries available")]
-    async fn releases_index_rejects_missing_version() {
-        let sandbox = create_empty_proto_sandbox();
-        let plugin = sandbox
-            .create_plugin_with_config("php-test", |config| {
-                config.host(HostOS::Linux, HostArch::X64);
-            })
-            .await;
-
-        // 8.4.2 is not in the releases index
-        plugin
-            .download_prebuilt(DownloadPrebuiltInput {
-                context: PluginContext {
-                    version: VersionSpec::parse("8.4.2").unwrap(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn releases_index_allows_known_version() {
-        let sandbox = create_empty_proto_sandbox();
-        let plugin = sandbox
-            .create_plugin_with_config("php-test", |config| {
-                config.host(HostOS::Linux, HostArch::X64);
-            })
-            .await;
-
-        // 8.4.18 is in the releases index with linux-x86_64
-        let output = plugin
-            .download_prebuilt(DownloadPrebuiltInput {
-                context: PluginContext {
-                    version: VersionSpec::parse("8.4.18").unwrap(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await;
-
-        assert!(output.download_url.contains("8.4.18"));
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn releases_index_skipped_for_windows() {
-        let sandbox = create_empty_proto_sandbox();
-        let plugin = sandbox
-            .create_plugin_with_config("php-test", |config| {
-                config.host(HostOS::Windows, HostArch::X64);
-            })
-            .await;
-
-        // Windows bypasses releases index (uses windows.php.net)
-        let output = plugin
-            .download_prebuilt(DownloadPrebuiltInput {
-                context: PluginContext {
-                    version: VersionSpec::parse("8.4.3").unwrap(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await;
-
-        assert!(output.download_url.contains("windows.php.net"));
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn download_url_windows_vs17() {
         let sandbox = create_empty_proto_sandbox();
         let plugin = sandbox
@@ -376,6 +308,30 @@ mod php_tool {
 
         // Should have help URL
         assert!(output.help_url.is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn download_url_sapi_fpm() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+                config.tool_config(serde_json::json!({"sapi": "fpm"}));
+            })
+            .await;
+
+        let output = plugin
+            .download_prebuilt(DownloadPrebuiltInput {
+                context: PluginContext {
+                    version: VersionSpec::parse("8.4.18").unwrap(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+
+        assert!(output.download_url.contains("-fpm-"));
+        assert!(!output.download_url.contains("-cli-"));
     }
 
     #[tokio::test(flavor = "multi_thread")]

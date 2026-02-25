@@ -3,13 +3,6 @@ use extism_pdk::*;
 use proto_pdk::*;
 use std::collections::HashMap;
 
-/// Releases index tracking which PHP versions have prebuilt binaries per platform.
-/// Each platform value is a SHA-256 hex checksum of the archive.
-#[derive(serde::Deserialize)]
-struct ReleasesIndex {
-    versions: HashMap<String, HashMap<String, String>>,
-}
-
 #[host_fn]
 extern "ExtismHost" {
     fn exec_command(input: Json<ExecCommandInput>) -> Json<ExecCommandOutput>;
@@ -148,6 +141,16 @@ pub fn download_prebuilt(
 
     let config = get_tool_config::<PhpPluginConfig>()?;
 
+    match config.sapi.as_str() {
+        "cli" | "fpm" | "micro" => {}
+        _ => {
+            return Err(plugin_err!(PluginError::Message(format!(
+                "Invalid sapi '{}'. Must be one of: cli, fpm, micro",
+                config.sapi
+            ))));
+        }
+    }
+
     if !config.prebuilt {
         return Err(plugin_err!(PluginError::Message(
             "Prebuilt binaries disabled via config. Will build from source.".into(),
@@ -196,72 +199,11 @@ pub fn download_prebuilt(
     }
 
     // Linux/macOS: static-php-cli prebuilt binaries
-    let platform = format!("{os}-{arch}");
-    let mut checksum: Option<Checksum> = None;
-
-    // Check releases index for prebuilt availability (only for default dist URL)
-    if config.dist_url == PhpPluginConfig::default().dist_url {
-        if let Ok(index) = fetch_json::<String, ReleasesIndex>(
-            "https://raw.githubusercontent.com/KonstantinKai/proto-php-plugin/main/releases.json"
-                .into(),
-        ) {
-            if let Some(platforms) = index.versions.get(&ver) {
-                if let Some(sha256) = platforms.get(&platform) {
-                    // Only set checksum if it looks like a valid sha256 hex (64 chars)
-                    if sha256.len() == 64 {
-                        checksum = Some(Checksum {
-                            algo: ChecksumAlgorithm::Sha256,
-                            hash: Some(sha256.clone()),
-                            key: None,
-                        });
-                    }
-                } else {
-                    let available = platforms.keys().cloned().collect::<Vec<_>>().join(", ");
-                    return Err(plugin_err!(PluginError::Message(format!(
-                        "PHP {ver} prebuilt binary is not available for {platform}. \
-                         Available platforms for this version: {available}. \
-                         Use --build flag or set prebuilt = false to build from source."
-                    ))));
-                }
-            } else {
-                // Version not in index — suggest nearby versions
-                let mut nearby: Vec<&String> = index
-                    .versions
-                    .keys()
-                    .filter(|v| {
-                        v.starts_with(
-                            &ver.rsplitn(2, '.')
-                                .nth(1)
-                                .map(|s| format!("{s}."))
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect();
-                nearby.sort();
-
-                let suggestion = if nearby.is_empty() {
-                    "Use --build flag or set prebuilt = false to build from source.".to_string()
-                } else {
-                    format!(
-                        "Available versions in the same series: {}. \
-                         Or use --build flag / set prebuilt = false to build from source.",
-                        nearby.iter().map(|v| v.as_str()).collect::<Vec<_>>().join(", ")
-                    )
-                };
-
-                return Err(plugin_err!(PluginError::Message(format!(
-                    "PHP {ver} does not have prebuilt binaries available. {suggestion}"
-                ))));
-            }
-        }
-        // NOTE: If the index fetch fails (network error), we proceed with the download
-        // attempt anyway — the index is a best-effort check.
-    }
-
-    let filename = format!("php-{ver}-cli-{os}-{arch}.tar.gz");
+    let filename = format!("php-{ver}-{sapi}-{os}-{arch}.tar.gz", sapi = config.sapi);
     let download_url = config
         .dist_url
         .replace("{version}", &ver)
+        .replace("{sapi}", &config.sapi)
         .replace("{os}", os)
         .replace("{arch}", arch)
         .replace("{file}", &filename);
@@ -270,7 +212,6 @@ pub fn download_prebuilt(
         download_url,
         download_name: Some(filename),
         archive_prefix: None,
-        checksum,
         ..DownloadPrebuiltOutput::default()
     }))
 }

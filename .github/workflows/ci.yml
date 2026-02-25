@@ -7,15 +7,11 @@ on:
     paths-ignore:
       - '*.md'
       - 'LICENSE'
-      - 'releases.json'
-      - 'scripts/**'
   pull_request:
     branches: [main]
     paths-ignore:
       - '*.md'
       - 'LICENSE'
-      - 'releases.json'
-      - 'scripts/**'
 
 jobs:
   build:
