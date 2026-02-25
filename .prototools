@@ -1,2 +1,0 @@
-[plugins]
-php = "file://./target/wasm32-wasip1/debug/php_tool.wasm"

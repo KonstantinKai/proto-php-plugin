@@ -186,6 +186,21 @@ Windows prebuilt binaries come from the official `windows.php.net` and cover all
 - `stable` / `lts` — same as `latest`
 - Partial versions like `8.4` resolve to the latest patch (e.g. `8.4.18`)
 
+## Comparison with phpenv / asdf-php
+
+| Feature | phpenv | asdf-php | proto-php-plugin |
+|---|---|---|---|
+| **Install method** | Compile from source | Compile from source | Prebuilt binaries |
+| **Install time** | 5–15 min | 5–15 min | Seconds |
+| **System deps needed** | Many (compiler, libs) | Many (compiler, libs) | None |
+| **Linux** | x64 | x64 | x64, arm64 |
+| **macOS** | x64, arm64 | x64, arm64 | x64, arm64 |
+| **Windows** | No | No | x64 |
+| **Version file** | `.php-version` | `.tool-versions` | `.php-version`, `composer.json` |
+| **Checksum verification** | No | No | SHA-256 |
+| **Build from source** | Only option | Only option | Opt-in fallback |
+| **Bundled extensions** | User-configured | User-configured | 37 built-in |
+
 ## Related
 
 - [proto-composer-plugin](https://github.com/KonstantinKai/proto-composer-plugin) — Composer (PHP dependency manager) version management for proto
