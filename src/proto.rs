@@ -2,6 +2,7 @@ use crate::config::PhpPluginConfig;
 use extism_pdk::*;
 use proto_pdk::*;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[host_fn]
 extern "ExtismHost" {
@@ -78,10 +79,7 @@ pub fn load_versions(Json(_): Json<LoadVersionsInput>) -> FnResult<Json<LoadVers
             }
             // Skip pre-release versions (RC, alpha, beta — case-insensitive)
             let lower = stripped.to_lowercase();
-            if lower.contains("rc")
-                || lower.contains("alpha")
-                || lower.contains("beta")
-            {
+            if lower.contains("rc") || lower.contains("alpha") || lower.contains("beta") {
                 return None;
             }
             Some(stripped.to_string())
@@ -187,8 +185,7 @@ pub fn download_prebuilt(
             "vs17"
         };
         let filename = format!("php-{ver}-nts-Win32-{vs}-x64.zip");
-        let download_url =
-            format!("https://windows.php.net/downloads/releases/{filename}");
+        let download_url = format!("https://windows.php.net/downloads/releases/{filename}");
 
         return Ok(Json(DownloadPrebuiltOutput {
             download_url,
@@ -216,23 +213,79 @@ pub fn download_prebuilt(
     }))
 }
 
-#[plugin_fn]
-pub fn build_instructions(
-    Json(input): Json<BuildInstructionsInput>,
-) -> FnResult<Json<BuildInstructionsOutput>> {
-    let env = get_host_environment()?;
-    let version = &input.context.version;
+fn spc_build_instructions(
+    env: &HostEnvironment,
+    version: &str,
+    sapi: &str,
+    extensions: &[String],
+) -> BuildInstructionsOutput {
+    let os = map_os(&env.os);
+    let arch = map_arch(&env.arch);
+    let spc_url =
+        format!("https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-{os}-{arch}");
+    let exts = extensions.join(",");
 
-    if env.os == HostOS::Windows {
-        return Err(plugin_err!(PluginError::Message(
-            "Building PHP from source is not supported on Windows. Use prebuilt binaries."
-                .into(),
-        )));
+    let binary_name = match sapi {
+        "fpm" => "php-fpm",
+        "micro" => "micro.sfx",
+        _ => "php",
+    };
+
+    let with_php = format!("--with-php={version}");
+    let for_extensions = format!("--for-extensions={exts}");
+    let build_sapi = format!("--build-{sapi}");
+
+    BuildInstructionsOutput {
+        help_url: Some("https://static-php.dev/en/guide/troubleshooting.html".into()),
+        source: None,
+        system_dependencies: vec![
+            SystemDependency::for_pm(
+                HostPackageManager::Apt,
+                ["build-essential", "cmake", "pkg-config"],
+            ),
+            SystemDependency::for_pm(HostPackageManager::Brew, ["cmake", "pkg-config"]),
+            SystemDependency::for_pm(
+                HostPackageManager::Dnf,
+                ["gcc", "gcc-c++", "make", "cmake", "pkgconf"],
+            ),
+        ],
+        requirements: vec![
+            BuildRequirement::XcodeCommandLineTools,
+            BuildRequirement::CommandExistsOnPath("curl".into()),
+        ],
+        instructions: vec![
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
+                "curl",
+                ["-fsSL", "-o", "spc", &spc_url],
+            ))),
+            BuildInstruction::MakeExecutable(PathBuf::from("spc")),
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
+                "./spc",
+                ["download", &with_php, &for_extensions, "--prefer-pre-built"],
+            ))),
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
+                "./spc",
+                ["doctor", "--auto-fix"],
+            ))),
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
+                "./spc",
+                ["build", &exts, &build_sapi],
+            ))),
+            BuildInstruction::MoveFile(
+                PathBuf::from(format!("buildroot/bin/{binary_name}")),
+                PathBuf::from(binary_name),
+            ),
+            BuildInstruction::MakeExecutable(PathBuf::from(binary_name)),
+        ],
     }
+}
 
-    let config = get_tool_config::<PhpPluginConfig>()?;
-
-    let prefix = format!("--prefix={}", input.install_dir);
+fn phpnet_build_instructions(
+    version: &str,
+    configure_opts: &Option<Vec<String>>,
+    install_dir: &str,
+) -> BuildInstructionsOutput {
+    let prefix = format!("--prefix={install_dir}");
     let mut configure_args: Vec<&str> = vec![
         &prefix,
         "--enable-mbstring",
@@ -245,12 +298,12 @@ pub fn build_instructions(
     ];
 
     let extra_opts;
-    if let Some(ref opts) = config.configure_opts {
+    if let Some(opts) = configure_opts {
         extra_opts = opts.clone();
         configure_args.extend(extra_opts.iter().map(|s| s.as_str()));
     }
 
-    Ok(Json(BuildInstructionsOutput {
+    BuildInstructionsOutput {
         help_url: Some("https://www.php.net/manual/en/install.unix.php".into()),
         source: Some(SourceLocation::Archive(ArchiveSource {
             url: format!("https://www.php.net/distributions/php-{version}.tar.xz"),
@@ -325,16 +378,43 @@ pub fn build_instructions(
                 "./configure",
                 configure_args,
             ))),
-            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
-                "make",
-                ["-j4"],
-            ))),
-            BuildInstruction::RunCommand(Box::new(CommandInstruction::new(
-                "make",
-                ["install"],
-            ))),
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new("make", ["-j4"]))),
+            BuildInstruction::RunCommand(Box::new(CommandInstruction::new("make", ["install"]))),
         ],
-    }))
+    }
+}
+
+#[plugin_fn]
+pub fn build_instructions(
+    Json(input): Json<BuildInstructionsInput>,
+) -> FnResult<Json<BuildInstructionsOutput>> {
+    let env = get_host_environment()?;
+    let version = &input.context.version;
+
+    if env.os == HostOS::Windows {
+        return Err(plugin_err!(PluginError::Message(
+            "Building PHP from source is not supported on Windows. Use prebuilt binaries.".into(),
+        )));
+    }
+
+    let config = get_tool_config::<PhpPluginConfig>()?;
+    let ver = version.to_string();
+
+    let output = if !ver.starts_with("7.") && config.configure_opts.is_none() {
+        // PHP 8.x without custom configure opts → spc (static-php-cli)
+        spc_build_instructions(&env, &ver, &config.sapi, &config.effective_extensions())
+    } else {
+        // PHP 7.x or custom configure opts → traditional php.net build
+        // NOTE: real_path() resolves the virtual WASI path to the actual filesystem path
+        let install_dir = input
+            .install_dir
+            .real_path()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| input.install_dir.to_string());
+        phpnet_build_instructions(&ver, &config.configure_opts, &install_dir)
+    };
+
+    Ok(Json(output))
 }
 
 #[plugin_fn]
@@ -352,10 +432,7 @@ pub fn locate_executables(
         "php".into()
     };
 
-    let exes = HashMap::from_iter([(
-        "php".into(),
-        ExecutableConfig::new_primary(primary),
-    )]);
+    let exes = HashMap::from_iter([("php".into(), ExecutableConfig::new_primary(primary))]);
 
     Ok(Json(LocateExecutablesOutput {
         exes,

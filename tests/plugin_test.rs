@@ -264,7 +264,7 @@ mod php_tool {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn build_instructions_returns_valid_output() {
+    async fn build_instructions_spc_for_php8() {
         let sandbox = create_empty_proto_sandbox();
         let plugin = sandbox
             .create_plugin_with_config("php-test", |config| {
@@ -288,26 +288,152 @@ mod php_tool {
             .await
             .unwrap();
 
-        // Source tarball from php.net
-        let source = output.source.expect("source should be set");
-        match source {
-            SourceLocation::Archive(archive) => {
-                assert!(archive.url.contains("php.net/distributions"));
-                assert!(archive.url.contains("8.4.3"));
-                assert!(archive.url.ends_with(".tar.xz"));
-                assert_eq!(archive.prefix, Some("php-8.4.3".into()));
-            }
-            _ => panic!("expected SourceLocation::Archive"),
-        }
+        // spc manages its own downloads — no source archive
+        assert!(output.source.is_none());
+
+        // Help URL points to static-php.dev
+        assert_eq!(output.help_url, Some("https://static-php.dev/en/guide/troubleshooting.html".into()));
 
         // Should have system dependencies
         assert!(!output.system_dependencies.is_empty());
 
-        // Should have build instructions (configure, make, make install)
-        assert_eq!(output.instructions.len(), 3);
+        // 7 instructions: curl, chmod, spc download, spc doctor, spc build, move, chmod
+        assert_eq!(output.instructions.len(), 7);
 
-        // Should have help URL
-        assert!(output.help_url.is_some());
+        // First instruction downloads spc via curl
+        let has_curl = output.instructions.iter().any(|i| {
+            matches!(i, BuildInstruction::RunCommand(cmd) if cmd.exe == "curl")
+        });
+        assert!(has_curl, "should download spc via curl");
+
+        // Should have spc build command
+        let has_spc_build = output.instructions.iter().any(|i| {
+            matches!(i, BuildInstruction::RunCommand(cmd)
+                if cmd.exe == "./spc" && cmd.args.first().map(|a| a.as_str()) == Some("build"))
+        });
+        assert!(has_spc_build, "should have spc build command");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn build_instructions_phpnet_for_php7() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+            })
+            .await;
+
+        let output: BuildInstructionsOutput = plugin
+            .tool
+            .plugin
+            .call_func_with(
+                PluginFunction::BuildInstructions,
+                BuildInstructionsInput {
+                    context: PluginContext {
+                        version: VersionSpec::parse("7.4.33").unwrap(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        // PHP 7.x uses php.net source archive
+        let source = output.source.expect("source should be set");
+        match source {
+            SourceLocation::Archive(archive) => {
+                assert!(archive.url.contains("php.net/distributions"));
+                assert!(archive.url.contains("7.4.33"));
+                assert!(archive.url.ends_with(".tar.xz"));
+                assert_eq!(archive.prefix, Some("php-7.4.33".into()));
+            }
+            _ => panic!("expected SourceLocation::Archive"),
+        }
+
+        // Should have configure/make/make install instructions
+        assert_eq!(output.instructions.len(), 3);
+        assert_eq!(
+            output.help_url,
+            Some("https://www.php.net/manual/en/install.unix.php".into())
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn build_instructions_phpnet_when_configure_opts_set() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+                config.tool_config(serde_json::json!({"configure-opts": ["--enable-intl"]}));
+            })
+            .await;
+
+        let output: BuildInstructionsOutput = plugin
+            .tool
+            .plugin
+            .call_func_with(
+                PluginFunction::BuildInstructions,
+                BuildInstructionsInput {
+                    context: PluginContext {
+                        version: VersionSpec::parse("8.4.3").unwrap(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        // PHP 8.x with configure-opts falls back to php.net
+        let source = output.source.expect("source should be set for phpnet path");
+        match source {
+            SourceLocation::Archive(archive) => {
+                assert!(archive.url.contains("php.net/distributions"));
+                assert!(archive.url.contains("8.4.3"));
+            }
+            _ => panic!("expected SourceLocation::Archive"),
+        }
+
+        // Should have configure/make/make install
+        assert_eq!(output.instructions.len(), 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn build_instructions_spc_fpm_sapi() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Linux, HostArch::X64);
+                config.tool_config(serde_json::json!({"sapi": "fpm"}));
+            })
+            .await;
+
+        let output: BuildInstructionsOutput = plugin
+            .tool
+            .plugin
+            .call_func_with(
+                PluginFunction::BuildInstructions,
+                BuildInstructionsInput {
+                    context: PluginContext {
+                        version: VersionSpec::parse("8.4.3").unwrap(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        // Should use spc path (PHP 8.x, no configure-opts)
+        assert!(output.source.is_none());
+
+        // Should have --build-fpm in spc build args
+        let has_build_fpm = output.instructions.iter().any(|i| {
+            matches!(i, BuildInstruction::RunCommand(cmd)
+                if cmd.exe == "./spc" && cmd.args.iter().any(|a| a == "--build-fpm"))
+        });
+        assert!(has_build_fpm, "should have --build-fpm arg");
     }
 
     #[tokio::test(flavor = "multi_thread")]

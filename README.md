@@ -17,7 +17,7 @@ proto install php
 
 ```bash
 # Install PHP
-proto install php 8.4
+proto install php 8.5
 
 # Use PHP
 proto run php -- --version
@@ -26,14 +26,14 @@ proto run php -- --version
 proto versions php
 
 # Pin a version in the current directory
-proto pin php 8.4
+proto pin php 8.5
 ```
 
 ## Version Detection
 
 The plugin automatically detects PHP versions from:
 
-- `.php-version` — plain version string (e.g. `8.4.12`)
+- `.php-version` — plain version string (e.g. `8.5.3`)
 - `composer.json` — reads `require.php` field (supports `>=`, `^`, `~`, `||` constraints)
 
 ## Configuration
@@ -45,15 +45,21 @@ Configure in `.prototools` under `[tools.php]`:
 # Disable prebuilt binaries and build from source (default: true)
 prebuilt = false
 
-# SAPI type for prebuilt binaries: "cli", "fpm", or "micro" (default: "cli")
+# SAPI type: "cli", "fpm", or "micro" (default: "cli")
+# Applies to prebuilt binaries and spc source builds (Linux/macOS only)
 sapi = "fpm"
 
 # Custom download URL template (advanced)
 # Placeholders: {version}, {sapi}, {os}, {arch}, {file}
 dist-url = "https://example.com/php-{version}-{sapi}-{os}-{arch}.tar.gz"
 
-# Extra flags passed to ./configure when building from source
+# Extra flags passed to ./configure when building from source (php.net path)
+# NOTE: Setting this forces the traditional configure/make build even for PHP 8.x
 configure-opts = ["--with-pdo-pgsql", "--enable-intl", "--enable-soap"]
+
+# Extensions for spc (static-php-cli) source builds (PHP 8.x only)
+# Defaults to the 37 extensions matching prebuilt binaries
+extensions = ["bcmath", "curl", "mbstring", "openssl", "pdo", "pdo_sqlite", "zip"]
 ```
 
 ## SAPI Selection
@@ -71,7 +77,7 @@ The [static-php-cli](https://static-php.dev) project provides prebuilt binaries 
 sapi = "fpm"
 ```
 
-The `sapi` option only applies to Linux and macOS prebuilt binaries. Windows binaries from `windows.php.net` are always NTS CLI builds and ignore this setting.
+The `sapi` option applies to Linux and macOS prebuilt binaries and spc source builds. Windows binaries from `windows.php.net` are always NTS CLI builds and ignore this setting. The php.net source build path also ignores this setting — use `configure-opts` with `--enable-fpm` instead.
 
 ## Supported Platforms
 
@@ -83,13 +89,49 @@ The `sapi` option only applies to Linux and macOS prebuilt binaries. Windows bin
 
 ## Building from Source
 
-If a prebuilt binary isn't available for your PHP version, proto will automatically fall back to building from source using official `php.net` tarballs. Set `prebuilt = false` to always build from source.
+If a prebuilt binary isn't available for your PHP version, proto will automatically fall back to building from source. Set `prebuilt = false` to always build from source.
 
 Building from source is not supported on Windows.
 
-### How it works
+### Build methods
 
-The plugin downloads the source tarball from `php.net/distributions/php-{version}.tar.xz`, then runs:
+The plugin uses two build methods depending on the PHP version and configuration:
+
+| Condition | Build method | Result |
+|---|---|---|
+| PHP 8.x, no `configure-opts` | spc ([static-php-cli](https://static-php.dev)) | Static binary, zero dependencies |
+| PHP 8.x, `configure-opts` set | php.net (`configure`/`make`) | Traditional build with custom flags |
+| PHP 7.x | php.net (`configure`/`make`) | Traditional build |
+
+### spc builds (PHP 8.x default)
+
+For PHP 8.x without custom configure flags, the plugin uses [static-php-cli](https://static-php.dev) (`spc`) to produce fully-static binaries — the same quality as prebuilt downloads. The spc binary is downloaded automatically.
+
+```
+curl -fsSL -o spc https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-{os}-{arch}
+./spc download --with-php={version} --for-extensions={exts} --prefer-pre-built
+./spc build {exts} --build-{sapi}
+```
+
+By default, spc builds include the same 37 extensions as the prebuilt binaries. You can customize the extension list:
+
+```toml
+[tools.php]
+prebuilt = false
+extensions = ["bcmath", "curl", "mbstring", "openssl", "pdo", "pdo_sqlite", "zip"]
+```
+
+Proto will prompt to install missing system packages automatically (via `apt`, `brew`, or `dnf`).
+
+**System dependencies (spc):**
+
+| apt | brew | dnf |
+|---|---|---|
+| `build-essential`, `cmake`, `pkg-config` | `cmake`, `pkg-config` | `gcc`, `gcc-c++`, `make`, `cmake`, `pkgconf` |
+
+### php.net builds (PHP 7.x / custom configure flags)
+
+For PHP 7.x, or when `configure-opts` is set, the plugin downloads the source tarball from `php.net/distributions/` and runs:
 
 ```
 ./configure --prefix=<install-dir> --enable-mbstring --enable-bcmath \
@@ -98,11 +140,12 @@ make -j4
 make install
 ```
 
-Proto will prompt to install missing system packages automatically (via `apt`, `brew`, or `dnf`).
+NOTE: Setting `configure-opts` forces the php.net build path even for PHP 8.x.
 
-### System dependencies
+**System dependencies (php.net):**
 
 **Ubuntu/Debian (apt):**
+
 ```
 build-essential autoconf bison re2c pkg-config libxml2-dev libsqlite3-dev
 libssl-dev libcurl4-openssl-dev libonig-dev libreadline-dev libzip-dev
@@ -110,12 +153,14 @@ zlib1g-dev libicu-dev
 ```
 
 **macOS (brew):**
+
 ```
 autoconf bison re2c pkg-config libxml2 openssl@3 curl oniguruma readline
 libzip zlib icu4c
 ```
 
 **Fedora/RHEL (dnf):**
+
 ```
 gcc gcc-c++ make autoconf bison re2c pkgconf libxml2-devel sqlite-devel
 openssl-devel libcurl-devel oniguruma-devel readline-devel libzip-devel
@@ -124,7 +169,7 @@ zlib-devel libicu-devel
 
 ### Custom configure flags
 
-Add extra `./configure` flags via `configure-opts`. These are appended after the defaults:
+Add extra `./configure` flags via `configure-opts`. These are appended after the defaults and force the php.net build path:
 
 ```toml
 [tools.php]
@@ -152,6 +197,46 @@ configure-opts = ["--with-libxml=/opt/homebrew/opt/libxml2"]
 
 On Intel Macs, use `/usr/local/opt/libxml2` instead.
 
+### macOS: PHP 7.x OpenSSL 3.x incompatibility
+
+PHP 7.x uses deprecated OpenSSL 1.x APIs that fail to compile against OpenSSL 3.x (shipped by default on modern macOS). If `make` fails with hundreds of `deprecated` warnings in `ext/openssl/openssl.c`, either point to OpenSSL 1.1:
+
+```toml
+[tools.php]
+prebuilt = false
+configure-opts = ["--with-openssl=/opt/homebrew/opt/openssl@1.1"]
+```
+
+Requires `brew install openssl@1.1`. On Intel Macs, use `/usr/local/opt/openssl@1.1` instead.
+
+Or build without OpenSSL:
+
+```toml
+[tools.php]
+prebuilt = false
+configure-opts = ["--without-openssl"]
+```
+
+### macOS: PHP 7.x DNS resolver linking error
+
+If linking fails with `Undefined symbols for architecture arm64: "_res_9_dn_expand"`, PHP 7.x needs the resolver library explicitly linked on modern macOS:
+
+```toml
+[tools.php]
+prebuilt = false
+configure-opts = ["EXTRA_LIBS=-lresolv"]
+```
+
+### macOS: PHP 7.x PCRE JIT allocation failure
+
+If `make` fails with `Allocation of JIT memory failed` while generating `phar.phar`, PCRE JIT can't allocate executable memory on macOS arm64 due to security restrictions. Disable it at compile time:
+
+```toml
+[tools.php]
+prebuilt = false
+configure-opts = ["--without-pcre-jit"]
+```
+
 ### macOS: iconv issue
 
 If `./configure` fails with `Please specify the install prefix of iconv`, either install iconv via Homebrew and point to it, or disable it:
@@ -161,6 +246,24 @@ If `./configure` fails with `Please specify the install prefix of iconv`, either
 prebuilt = false
 configure-opts = ["--without-iconv"]
 ```
+
+### spc: GitHub API rate limit
+
+The `spc download` command fetches release info from the GitHub API, which limits unauthenticated requests to 60/hour per IP. If you see a 403 error like:
+
+```
+curl: (56) The requested URL returned error: 403
+Download failed: Failed to fetch "https://api.github.com/repos/static-php/static-php-cli-hosted/releases"
+```
+
+Set a GitHub token before installing:
+
+```bash
+export GITHUB_TOKEN="ghp_your_token_here"
+proto install php 8.5
+```
+
+Generate a token at **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens** — no special permissions needed.
 
 ## PHP Extensions
 
@@ -204,7 +307,7 @@ Windows prebuilt binaries come from the official `windows.php.net` and cover all
 
 - `latest` — resolves to the newest stable PHP release
 - `stable` / `lts` — same as `latest`
-- Partial versions like `8.4` resolve to the latest patch (e.g. `8.4.18`)
+- Partial versions like `8.5` resolve to the latest patch (e.g. `8.5.3`)
 
 ## Comparison with phpenv / asdf-php
 
