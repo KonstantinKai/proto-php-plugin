@@ -1,21 +1,13 @@
 #!/usr/bin/env bash
 # Probe dl.static-php.dev for available PHP prebuilt binaries.
 # Outputs a JSON file with verified version/platform availability and SHA-256 checksums.
-# Reuses existing checksums from previous runs to avoid re-downloading.
+# NOTE: Checksums are always recomputed because static-php-cli may rebuild binaries in-place.
 set -euo pipefail
 
 OUTPUT="${1:-releases.json}"
 BASE_URL="https://dl.static-php.dev/static-php-cli/common"
 
 platforms=("linux-x86_64" "linux-aarch64" "macos-x86_64" "macos-aarch64")
-
-# Read existing checksum from previous releases.json
-get_existing_checksum() {
-  local ver="$1" plat="$2"
-  if [ -f "$OUTPUT" ] && command -v jq &>/dev/null; then
-    jq -r --arg v "$ver" --arg p "$plat" '.versions[$v][$p] // empty' "$OUTPUT" 2>/dev/null || true
-  fi
-}
 
 echo "Probing static-php-cli for available PHP versions..."
 
@@ -35,15 +27,9 @@ for major_minor in 8.0 8.1 8.2 8.3 8.4 8.5; do
       for platform in "${platforms[@]}"; do
         pcode=$(curl -sI -o /dev/null -w "%{http_code}" "${BASE_URL}/php-${ver}-cli-${platform}.tar.gz" 2>/dev/null || echo "000")
         if [ "$pcode" = "302" ] || [ "$pcode" = "200" ]; then
-          existing=$(get_existing_checksum "$ver" "$platform")
-          if [ -n "$existing" ]; then
-            sha="$existing"
-            echo "    $platform: reused" >&2
-          else
-            url="${BASE_URL}/php-${ver}-cli-${platform}.tar.gz"
-            sha=$(curl -sSL "$url" | sha256sum | awk '{print $1}')
-            echo "    $platform: computed $sha" >&2
-          fi
+          url="${BASE_URL}/php-${ver}-cli-${platform}.tar.gz"
+          sha=$(curl -sSL "$url" | sha256sum | awk '{print $1}')
+          echo "    $platform: $sha" >&2
           version_obj=$(echo "$version_obj" | jq --arg p "$platform" --arg s "$sha" '. + {($p): $s}')
         fi
       done
