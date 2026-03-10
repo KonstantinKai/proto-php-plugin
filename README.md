@@ -327,6 +327,10 @@ Windows prebuilt binaries come from the official `windows.php.net` and cover all
 
 - [proto-composer-plugin](https://github.com/KonstantinKai/proto-composer-plugin) — Composer (PHP dependency manager) version management for proto
 
+## Support
+
+If you find this plugin useful, please give it a star on GitHub — it helps others discover the project!
+
 ## License
 
 MIT
