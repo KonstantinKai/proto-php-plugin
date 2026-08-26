@@ -86,10 +86,29 @@ jobs:
       - name: Add proto to PATH
         run: echo "$HOME/.proto/bin" >> "$GITHUB_PATH"
 
+      - name: Resolve latest pre-built PHP 8.4
+        # static-php.dev publishes archives a few patch releases behind the
+        # php-src tags the plugin lists, so pick the newest 8.4.x that exists.
+        run: |
+          case "${{ runner.os }}" in
+            Linux) target="linux-x86_64" ;;
+            macOS) target="macos-aarch64" ;;
+            *) echo "Unsupported runner: ${{ runner.os }}" >&2; exit 1 ;;
+          esac
+          version=$(curl -fsSL https://dl.static-php.dev/static-php-cli/common/ \
+            | grep -oE "php-8\.4\.[0-9]+-cli-$target\.tar\.gz" \
+            | sed -E 's/php-([0-9.]+)-cli.*/\1/' \
+            | sort -V | tail -1)
+          if [ -z "$version" ]; then
+            echo "No pre-built PHP 8.4 archive found for $target" >&2
+            exit 1
+          fi
+          echo "PHP_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Register plugin and install PHP
         run: |
           proto plugin add php "file://./target/wasm32-wasip1/debug/php_tool.wasm"
-          proto install php 8.4
+          proto install php "$PHP_VERSION"
 
       - name: Verify PHP
         run: proto run php -- --version
