@@ -1,6 +1,6 @@
 [package]
 name = "php_tool"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 description = "A proto WASM plugin for managing PHP versions"
@@ -12,15 +12,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 extism-pdk = "1.4"
-proto_pdk = "0.32"
-schematic = { version = "0.19", default-features = false, features = [
+proto_pdk = "0.35"
+schematic = { version = "0.20", default-features = false, features = [
   "schema",
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-proto_pdk_test_utils = "0.43"
+proto_pdk_test_utils = "0.49"
 starbase_sandbox = "0.10"
 tokio = { version = "1", features = ["macros"] }
 

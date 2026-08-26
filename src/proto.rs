@@ -16,7 +16,7 @@ pub fn register_tool(Json(_): Json<RegisterToolInput>) -> FnResult<Json<Register
     Ok(Json(RegisterToolOutput {
         name: NAME.into(),
         type_of: PluginType::Language,
-        minimum_proto_version: Some(Version::new(0, 46, 0)),
+        minimum_proto_version: Some(Version::new(0, 56, 0)),
         plugin_version: Version::parse(env!("CARGO_PKG_VERSION")).ok(),
         ..RegisterToolOutput::default()
     }))
@@ -277,6 +277,7 @@ fn spc_build_instructions(
             ),
             BuildInstruction::MakeExecutable(PathBuf::from(binary_name)),
         ],
+        ..BuildInstructionsOutput::default()
     }
 }
 
@@ -381,6 +382,7 @@ fn phpnet_build_instructions(
             BuildInstruction::RunCommand(Box::new(CommandInstruction::new("make", ["-j4"]))),
             BuildInstruction::RunCommand(Box::new(CommandInstruction::new("make", ["install"]))),
         ],
+        ..BuildInstructionsOutput::default()
     }
 }
 
@@ -408,8 +410,8 @@ pub fn build_instructions(
         // NOTE: real_path() resolves the virtual WASI path to the actual filesystem path
         let install_dir = input
             .install_dir
-            .real_path()
-            .map(|p| p.to_string_lossy().to_string())
+            .to_real_path()?
+            .map(|p| p.to_string())
             .unwrap_or_else(|| input.install_dir.to_string());
         phpnet_build_instructions(&ver, &config.configure_opts, &install_dir)
     };

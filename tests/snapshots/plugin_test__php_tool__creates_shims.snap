@@ -5,7 +5,7 @@ expression: "std :: fs ::\nread_to_string(sandbox.path().join(\".proto/shims/reg
 ---
 {
   "php": {
-    "alt_bin": true,
-    "parent": "php-test"
+    "alt_exe": true,
+    "context": "php-test"
   }
 }
