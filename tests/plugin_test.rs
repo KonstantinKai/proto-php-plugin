@@ -4,7 +4,7 @@ mod php_tool {
     use super::*;
 
     generate_resolve_versions_tests!("php-test", {
-        "8.4" => "8.4.25",
+        "8.0" => "8.0.30",
     });
 
     #[tokio::test(flavor = "multi_thread")]
