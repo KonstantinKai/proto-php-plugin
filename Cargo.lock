@@ -3624,7 +3624,7 @@ dependencies = [
 
 [[package]]
 name = "php_tool"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "extism-pdk",
  "proto_pdk",

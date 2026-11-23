@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-23
+
 ### Added
 
 - Windows prebuilt binaries for PHP 8.6, which windows.php.net builds with Visual Studio 2026 (`vs18`) ([#2](https://github.com/KonstantinKai/proto-php-plugin/pull/2)).
@@ -80,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version detection from `.php-version` and `composer.json` (`require.php`).
 - Configurable `./configure` flags for source builds.
 
-[Unreleased]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KonstantinKai/proto-php-plugin/compare/v0.2.0...v0.3.0
