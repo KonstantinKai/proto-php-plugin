@@ -24,7 +24,11 @@ fi
 # commit has no PR), grouped below. Plain lines keep this working on bash 3.2.
 pairs=""
 
-for sha in $(git rev-list --no-merges --reverse "$range"); do
+# Assigned first so a bad range fails the script; a failing substitution in a
+# for-list does not trigger errexit and would silently drop the credits.
+shas="$(git rev-list --no-merges --reverse "$range")"
+
+for sha in $shas; do
   author="$(gh api "repos/$repo/commits/$sha" \
     --jq '"\(.author.login // "-") \(.author.type // "-")"')"
   login="${author% *}"
