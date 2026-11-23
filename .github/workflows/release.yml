@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history and tags, so release-thanks.sh can find the previous tag.
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -40,9 +43,15 @@ jobs:
           wasm-strip "$output"
           sha256sum "$output" > "$output.sha256"
 
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/release-notes.sh --thanks "${GITHUB_REF_NAME}" > builds/RELEASE_NOTES.md
+
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: builds/*
+          bodyFile: builds/RELEASE_NOTES.md
+          artifacts: builds/php_tool.wasm,builds/php_tool.wasm.sha256
           artifactErrorsFailBuild: true
           skipIfReleaseExists: true
