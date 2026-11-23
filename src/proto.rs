@@ -172,7 +172,7 @@ pub fn download_prebuilt(
     // Windows uses official php.net binaries
     if env.os == HostOS::Windows {
         // Compiler version depends on PHP major.minor:
-        // 7.x = vc15, 8.0-8.3 = vs16, 8.4+ = vs17
+        // 7.x = vc15, 8.0-8.3 = vs16, 8.4-8.5 = vs17, 8.6+ = vs18
         let vs = if ver.starts_with("7.") {
             "vc15"
         } else if ver.starts_with("8.0.")
@@ -181,9 +181,7 @@ pub fn download_prebuilt(
             || ver.starts_with("8.3.")
         {
             "vs16"
-        } else if ver.starts_with("8.4.")
-            || ver.starts_with("8.5.")
-        {
+        } else if ver.starts_with("8.4.") || ver.starts_with("8.5.") {
             "vs17"
         } else {
             "vs18"

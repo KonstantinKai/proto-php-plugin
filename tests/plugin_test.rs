@@ -45,10 +45,7 @@ mod php_tool {
 
         let php = output.exes.get("php").expect("php executable missing");
         assert!(php.primary);
-        assert_eq!(
-            php.exe_path.as_deref(),
-            Some(std::path::Path::new("php"))
-        );
+        assert_eq!(php.exe_path.as_deref(), Some(std::path::Path::new("php")));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -60,8 +57,7 @@ mod php_tool {
         assert!(!output.versions.is_empty());
 
         // Should contain recent PHP versions
-        let version_strings: Vec<String> =
-            output.versions.iter().map(|v| v.to_string()).collect();
+        let version_strings: Vec<String> = output.versions.iter().map(|v| v.to_string()).collect();
         assert!(version_strings.iter().any(|v| v.starts_with("8.4")));
         assert!(version_strings.iter().any(|v| v.starts_with("8.3")));
     }
@@ -70,7 +66,9 @@ mod php_tool {
     async fn detects_version_files() {
         let sandbox = create_empty_proto_sandbox();
         let plugin = sandbox.create_plugin("php-test").await;
-        let output = plugin.detect_version_files(DetectVersionInput::default()).await;
+        let output = plugin
+            .detect_version_files(DetectVersionInput::default())
+            .await;
 
         assert_eq!(output.files, vec![".php-version", "composer.json"]);
         assert_eq!(output.ignore, vec!["vendor"]);
@@ -229,6 +227,31 @@ mod php_tool {
         assert!(output.download_url.contains("vs17-x64.zip"));
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn download_url_windows_vs18() {
+        let sandbox = create_empty_proto_sandbox();
+        let plugin = sandbox
+            .create_plugin_with_config("php-test", |config| {
+                config.host(HostOS::Windows, HostArch::X64);
+            })
+            .await;
+
+        let output = plugin
+            .download_prebuilt(DownloadPrebuiltInput {
+                context: PluginContext {
+                    version: VersionSpec::parse("8.6.0").unwrap(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await;
+
+        assert_eq!(
+            output.download_url,
+            "https://windows.php.net/downloads/releases/php-8.6.0-nts-Win32-vs18-x64.zip"
+        );
+    }
+
     // Integration tests: actual download + install
     generate_download_install_tests!("php-test", "8.4.12");
 
@@ -260,7 +283,10 @@ mod php_tool {
         assert!(dir_b.exists(), "8.3.20 product dir should exist");
 
         // Both versions should coexist
-        assert!(dir_a.exists(), "8.4.12 should still exist after installing 8.3.20");
+        assert!(
+            dir_a.exists(),
+            "8.4.12 should still exist after installing 8.3.20"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -292,7 +318,10 @@ mod php_tool {
         assert!(output.source.is_none());
 
         // Help URL points to static-php.dev
-        assert_eq!(output.help_url, Some("https://static-php.dev/en/guide/troubleshooting.html".into()));
+        assert_eq!(
+            output.help_url,
+            Some("https://static-php.dev/en/guide/troubleshooting.html".into())
+        );
 
         // Should have system dependencies
         assert!(!output.system_dependencies.is_empty());
@@ -301,9 +330,10 @@ mod php_tool {
         assert_eq!(output.instructions.len(), 7);
 
         // First instruction downloads spc via curl
-        let has_curl = output.instructions.iter().any(|i| {
-            matches!(i, BuildInstruction::RunCommand(cmd) if cmd.exe == "curl")
-        });
+        let has_curl = output
+            .instructions
+            .iter()
+            .any(|i| matches!(i, BuildInstruction::RunCommand(cmd) if cmd.exe == "curl"));
         assert!(has_curl, "should download spc via curl");
 
         // Should have spc build command
