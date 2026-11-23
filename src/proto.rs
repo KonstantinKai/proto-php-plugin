@@ -181,8 +181,12 @@ pub fn download_prebuilt(
             || ver.starts_with("8.3.")
         {
             "vs16"
-        } else {
+        } else if ver.starts_with("8.4.")
+            || ver.starts_with("8.5.")
+        {
             "vs17"
+        } else {
+            "vs18"
         };
         let filename = format!("php-{ver}-nts-Win32-{vs}-x64.zip");
         let download_url = format!("https://windows.php.net/downloads/releases/{filename}");
